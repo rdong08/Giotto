@@ -12,7 +12,8 @@
 #' @param dimensions_to_use number of dimensions to use as input
 #' @param name name of HMRF run
 #' @param k  number of HMRF domains
-#' @param betas betas to test for
+#' @param seed seed to fix random number generator (for creating initialization of HMRF) (-1 if no fixing)
+#' @param betas betas to test for. three numbers: start_beta, beta_increment, num_betas e.g. c(0, 2.0, 50)
 #' @param tolerance tolerance
 #' @param zscore zscore
 #' @param numinit number of initializations
@@ -22,8 +23,6 @@
 #' @return Creates a directory with results that can be viewed with viewHMRFresults
 #' @details Description of HMRF parameters ...
 #' @export
-#' @examples
-#'     doHMRF(gobject)
 doHMRF <- function(gobject,
                    expression_values = c('normalized', 'scaled', 'custom'),
                    spatial_network_name = 'Delaunay_network',
@@ -32,6 +31,7 @@ doHMRF <- function(gobject,
                    dim_reduction_to_use = NULL,
                    dim_reduction_name = 'pca',
                    dimensions_to_use = 1:10,
+                   seed = 100,
                    name = 'test',
                    k = 10,
                    betas = c(0, 2, 50),
@@ -41,6 +41,16 @@ doHMRF <- function(gobject,
                    python_path = NULL,
                    output_folder = NULL,
                    overwrite_output = TRUE) {
+
+
+  if(!requireNamespace('smfishHmrf', quietly = TRUE)) {
+    stop("\n package ", 'smfishHmrf' ," is not yet installed \n",
+         "To install: \n",
+         "remotes::install_bitbucket(repo = 'qzhudfci/smfishhmrf-r', ref='master')",
+         "see http://spatial.rc.fas.harvard.edu/install.html for more information",
+         call. = FALSE)
+  }
+
 
   # data.table set global variable
   to = from = NULL
@@ -87,15 +97,16 @@ doHMRF <- function(gobject,
   # overwrite if exists
   if(file.exists(expression_file) & overwrite_output == TRUE) {
     cat('\n expression_matrix.txt already exists at this location, will be overwritten \n')
-    write.table(expr_values,
-                file = expression_file,
-                quote = F, col.names = NA, row.names = T)
+    data.table::fwrite(data.table::as.data.table(expr_values, keep.rownames="gene"), file=expression_file, quot=F, col.names=T, row.names=F, sep=" ")
+
+    #write.table(expr_values, file = expression_file, quote = F, col.names = NA, row.names = T)
   } else if(file.exists(expression_file) & overwrite_output == FALSE) {
     cat('\n expression_matrix.txt already exists at this location, will be used again \n')
   } else {
-    write.table(expr_values,
-                file = expression_file,
-                quote = F, col.names = NA, row.names = T)
+    data.table::fwrite(data.table::as.data.table(expr_values, keep.rownames="gene"), file=expression_file, quot=F, col.names=T, row.names=F, sep=" ")
+    #write.table(expr_values,
+    #            file = expression_file,
+    #            quote = F, col.names = NA, row.names = T)
   }
 
 
@@ -188,6 +199,13 @@ doHMRF <- function(gobject,
   output_data = paste0(output_folder,'/', 'result.spatial.zscore')
   if(!file.exists(output_data)) dir.create(output_data)
 
+  # encapsulate to avoid path problems
+  # python code also needs to be updated internally
+  cell_location =  paste0('"', cell_location, '"')
+  spatial_genes =  paste0('"', spatial_genes, '"')
+  spatial_network =  paste0('"', spatial_network, '"')
+  expression_data =  paste0('"', expression_data, '"')
+  output_data =  paste0('"', output_data, '"')
 
   # process other params
   zscore = match.arg(zscore, c('none','rowcol', 'colrow'))
@@ -206,6 +224,7 @@ doHMRF <- function(gobject,
                           ' ', betas_final,
                           ' -t ', tolerance,
                           ' -z ', zscore,
+                          ' -s ', seed,
                           ' -i ', numinit)
 
   print(reader_command)
@@ -239,8 +258,6 @@ doHMRF <- function(gobject,
 #' @return reloads a previous ran HMRF from doHRMF
 #' @details Description of HMRF parameters ...
 #' @export
-#' @examples
-#'     loadHMRF(gobject)
 loadHMRF = function(name_used = 'test',
                     output_folder_used,
                     k_used = 10,
@@ -276,18 +293,16 @@ loadHMRF = function(name_used = 'test',
 #' @param HMRFoutput HMRF output from doHMRF
 #' @param k number of HMRF domains
 #' @param betas_to_view results from different betas that you want to view
-#' @param ... paramters to visPlot()
+#' @param third_dim 3D data (boolean)
+#' @param \dots additional paramters (see details)
 #' @return spatial plots with HMRF domains
-#' @details Description ...
-#' @seealso \code{\link{visPlot}}
+#' @seealso \code{\link{spatPlot2D}} and \code{\link{spatPlot3D}}
 #' @export
-#' @examples
-#'     viewHMRFresults(gobject)
 viewHMRFresults <- function(gobject,
                             HMRFoutput,
                             k = NULL,
                             betas_to_view = NULL,
-                            third_dim = NULL,
+                            third_dim = FALSE,
                             ...) {
 
 
@@ -333,7 +348,12 @@ viewHMRFresults <- function(gobject,
 
     title_name = paste0('k = ', k, ' b = ',b)
 
-    visPlot(gobject = gobject, sdimz = third_dim, cell_color = output, show_plot = T, title = title_name,...)
+    spatPlot2D(gobject = gobject, cell_color = output, show_plot = T, title = title_name, ...)
+
+    if(third_dim == TRUE) {
+      spatPlot3D(gobject = gobject, cell_color = output, show_plot = T, ...)
+    }
+    #visPlot(gobject = gobject, sdimz = third_dim, cell_color = output, show_plot = T, title = title_name,...)
   }
 }
 
@@ -349,8 +369,6 @@ viewHMRFresults <- function(gobject,
 #' @param print_command see the python command
 #' @return data.table with HMRF results for each b and the selected k
 #' @export
-#' @examples
-#'     writeHMRFresults(gobject)
 writeHMRFresults <- function(gobject,
                              HMRFoutput,
                              k = NULL,
@@ -423,12 +441,9 @@ writeHMRFresults <- function(gobject,
 #' @param HMRFoutput HMRF output from doHMRF()
 #' @param k number of domains
 #' @param betas_to_add results from different betas that you want to add
-#' @param name specify a custom name
+#' @param hmrf_name specify a custom name
 #' @return giotto object
-#' @details Description ...
 #' @export
-#' @examples
-#'     addHMRF(gobject)
 addHMRF <- function(gobject,
                     HMRFoutput,
                     k = NULL,
@@ -512,18 +527,14 @@ addHMRF <- function(gobject,
 #' @param HMRFoutput HMRF output from doHMRF
 #' @param k number of HMRF domains
 #' @param betas_to_view results from different betas that you want to view
-#' @param ... paramters to visPlot()
+#' @param \dots additional parameters to spatPlot2D()
 #' @return spatial plots with HMRF domains
-#' @details Description ...
 #' @seealso \code{\link{spatPlot2D}}
 #' @export
-#' @examples
-#'     viewHMRFresults2D(gobject)
 viewHMRFresults2D <- function(gobject,
                             HMRFoutput,
                             k = NULL,
                             betas_to_view = NULL,
-                            third_dim = NULL,
                             ...) {
 
 
@@ -581,18 +592,14 @@ viewHMRFresults2D <- function(gobject,
 #' @param HMRFoutput HMRF output from doHMRF
 #' @param k number of HMRF domains
 #' @param betas_to_view results from different betas that you want to view
-#' @param ... paramters to visPlot()
+#' @param \dots additional parameters to spatPlot3D()
 #' @return spatial plots with HMRF domains
-#' @details Description ...
 #' @seealso \code{\link{spatPlot3D}}
 #' @export
-#' @examples
-#'     viewHMRFresults3D(gobject)
 viewHMRFresults3D <- function(gobject,
                               HMRFoutput,
                               k = NULL,
                               betas_to_view = NULL,
-                              third_dim = NULL,
                               ...) {
 
 

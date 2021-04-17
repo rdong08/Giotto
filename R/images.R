@@ -5,11 +5,15 @@
 #' @description converts a magick image object to a data.table
 #' @param mg_object magick image or Giotto image object
 #' @return data.table with image pixel information
+#' @keywords internal
 convert_mgImage_to_array_DT = function(mg_object) {
 
-  if(is(mg_object, 'imageGiottoObj')) {
+  if(methods::is(mg_object, 'imageGiottoObj')) {
     mg_object = mg_object$mg_object
   }
+
+  # data.table variables
+  RGB = c.1 = c.2 = c.3 = NULL
 
   # convert magick object to an array
   num_res = as.numeric(mg_object[[1]])
@@ -30,17 +34,15 @@ convert_mgImage_to_array_DT = function(mg_object) {
 #' @param top_color_range top possible background colors to return
 #' @return vector of pixel color frequencies and an associated barplot
 #' @export
-#' @examples
-#'     estimateImageBg(mg_object)
 estimateImageBg = function(mg_object, top_color_range = 1:50) {
 
-  if(is(mg_object, 'imageGiottoObj')) {
+  if(methods::is(mg_object, 'imageGiottoObj')) {
     mg_object = mg_object$mg_object
   }
 
   arrayDT = convert_mgImage_to_array_DT(mg_object = mg_object)
   sort_table = sort(table(arrayDT$RGB), decreasing = T)
-  barplot(sort_table[top_color_range], col=names(sort_table[top_color_range]))
+  graphics::barplot(sort_table[top_color_range], col=names(sort_table[top_color_range]))
 
   cat('Most abundant pixel colors: \n')
   print(sort_table[top_color_range])
@@ -54,11 +56,14 @@ estimateImageBg = function(mg_object, top_color_range = 1:50) {
 #' @param bg_color estimated current background color
 #' @param perc_range range around estimated background color to include (percentage)
 #' @param new_color new background color
+#' @param new_name change name of Giotto image
 #' @return magick image or giotto image object with updated background color
 #' @export
-#' @examples
-#'     changeImageBg(mg_object)
-changeImageBg = function(mg_object, bg_color, perc_range = 10, new_color = '#FFFFFF', new_name = NULL) {
+changeImageBg = function(mg_object,
+                         bg_color,
+                         perc_range = 10,
+                         new_color = '#FFFFFF',
+                         new_name = NULL) {
 
   if(methods::is(mg_object, 'imageGiottoObj')) {
     is_g_image = TRUE
@@ -150,8 +155,6 @@ changeImageBg = function(mg_object, bg_color, perc_range = 10, new_color = '#FFF
 #' @param ymin_adj adjustment of the minimum y-value to align the image
 #' @return a giotto image object
 #' @export
-#' @examples
-#'     createGiottoImage(mg_object)
 createGiottoImage = function(gobject = NULL,
                              spatial_locs = NULL,
                              mg_object,
@@ -160,7 +163,7 @@ createGiottoImage = function(gobject = NULL,
                              xmin_adj = 0,
                              ymax_adj = 0,
                              ymin_adj = 0) {
-  if(!is(mg_object, 'magick-image')) {
+  if(!methods::is(mg_object, 'magick-image')) {
     if(file.exists(mg_object)) {
       mg_object = try(magick::image_read(mg_object))
       if(class(mg_object) == 'try-error') {
@@ -204,8 +207,6 @@ createGiottoImage = function(gobject = NULL,
 #' @param images list of giotto image objects, see \code{\link{createGiottoImage}}
 #' @return an updated Giotto object with access to the list of images
 #' @export
-#' @examples
-#'     addGiottoImage(mg_object)
 addGiottoImage = function(gobject,
                     images) {
 
@@ -215,7 +216,7 @@ addGiottoImage = function(gobject,
 
     im = images[[image_i]]
 
-    if(is(im, 'imageGiottoObj')) {
+    if(methods::is(im, 'imageGiottoObj')) {
       im_name = im$name
 
       all_im_names = names(gobject@images)
@@ -242,8 +243,6 @@ addGiottoImage = function(gobject,
 #' @param gimage a giotto image, see \code{\link{createGiottoImage}}
 #' @return an updated spatial ggplot object
 #' @export
-#' @examples
-#'     addGiottoImageToSpatPlot(mg_object)
 addGiottoImageToSpatPlot = function(spatpl = NULL,
                               gimage = NULL) {
 
@@ -287,8 +286,6 @@ addGiottoImageToSpatPlot = function(spatpl = NULL,
 #' @param verbose verbosity of function
 #' @return a vector of giotto image names attached to the giotto object
 #' @export
-#' @examples
-#'     showGiottoImageNames(gobject)
 showGiottoImageNames = function(gobject,
                           verbose = TRUE) {
   if(is.null(gobject)) stop('A giotto object needs to be provided \n')
@@ -316,8 +313,6 @@ showGiottoImageNames = function(gobject,
 #' @param return_gobject return a giotto object
 #' @return a giotto object or an updated giotto image if return_gobject = F
 #' @export
-#' @examples
-#'     updateGiottoImage(gobject)
 updateGiottoImage = function(gobject,
                        image_name,
                        xmax_adj = 0,
@@ -349,11 +344,9 @@ updateGiottoImage = function(gobject,
 #' @name getGiottoImage
 #' @description get get a giotto image from a giotto object
 #' @param gobject giotto object
-#' @param image_name name of giotto image \code{\link{showImageNames}}
+#' @param image_name name of giotto image \code{\link{showGiottoImageNames}}
 #' @return a giotto image
 #' @export
-#' @examples
-#'     getGiottoImage(gobject)
 getGiottoImage = function(gobject,
                           image_name) {
 
@@ -371,11 +364,9 @@ getGiottoImage = function(gobject,
 #' @name plotGiottoImage
 #' @description get plot a giotto image from a giotto object
 #' @param gobject giotto object
-#' @param image_name name of giotto image \code{\link{showImageNames}}
+#' @param image_name name of giotto image \code{\link{showGiottoImageNames}}
 #' @return plot
 #' @export
-#' @examples
-#'     plotGiottoImage(gobject)
 plotGiottoImage = function(gobject,
                            image_name) {
 
@@ -385,7 +376,6 @@ plotGiottoImage = function(gobject,
   g_image_names = names(gobject@images)
   if(!image_name %in% g_image_names) stop(image_name, ' was not found among the image names, see showImageNames()')
 
-  plot(gobject@images[[image_name]]$mg_object)
+  graphics::plot(gobject@images[[image_name]]$mg_object)
 }
-
 

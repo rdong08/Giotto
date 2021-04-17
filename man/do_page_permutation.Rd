@@ -9,6 +9,4 @@ do_page_permutation(gobject, sig_gene, ntimes)
 \description{
 creates permutation for the PAGEEnrich test
 }
-\examples{
-    do_page_permutation()
-}
+\keyword{internal}

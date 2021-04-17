@@ -9,6 +9,8 @@
 #' @param reduction_method method used to reduce dimensions
 #' @param coordinates accepts the coordinates after dimension reduction
 #' @param misc any additional information will be added to this slot
+#' @param my_rownames rownames
+#' @keywords internal
 #' @return number of distinct colors
 create_dimObject = function(name = 'test',
                             reduction_method = NULL,
@@ -35,12 +37,60 @@ create_dimObject = function(name = 'test',
 }
 
 
+
+#' @title select_dimReduction
+#' @name select_dimReduction
+#' @description Creates an object that stores a dimension reduction output
+#' @keywords internal
+#' @return dim reduction coordinates (default) or dim reduction object
+select_dimReduction = function(gobject,
+                               reduction = c('cells', 'genes'),
+                               reduction_method = c('pca', 'umap', 'tsne'),
+                               name = 'pca',
+                               return_dimObj = FALSE) {
+
+
+  ## check parameters
+  reduction = match.arg(arg = reduction, choices = c('cells', 'genes'))
+  reduction_method = match.arg(arg = reduction_method, choices = c('pca', 'umap', 'tsne'))
+
+  ## check reduction
+  reduction_res = gobject@dimension_reduction[[reduction]]
+  if(is.null(reduction_res)) {
+    stop('No dimension reduction for ', reduction, ' has been applied \n')
+  }
+
+  ## check method
+  reduction_res = reduction_res[[reduction_method]]
+  if(is.null(reduction_res)) {
+    stop(reduction_method, ' has not been performed on this dataset \n')
+  }
+
+  ## check name for method
+  reduction_res = reduction_res[[name]]
+  if(is.null(reduction_res)) {
+    stop(name, ': this name is not available for method: ', reduction_method, '\n')
+  }
+
+  ## return object or coordinates
+  if(return_dimObj == TRUE) {
+    return(reduction_res)
+  } else {
+    return(reduction_res$coordinates)
+  }
+
+}
+
+
+
+
 #' @title standardise_giotto
 #' @name standardise_giotto
 #' @description standardises a matrix
 #' @param x matrix
 #' @param center center data
 #' @param scale scale data
+#' @keywords internal
 #' @return standardized matrix
 standardise_giotto = function (x, center = TRUE, scale = TRUE)
 {
@@ -52,11 +102,11 @@ standardise_giotto = function (x, center = TRUE, scale = TRUE)
   }
   else if (center & !scale) {
     m <- Rfast::colmeans(x)
-    y <- eachrow(x, m, oper = "-")
+    y <- Rfast::eachrow(x, m, oper = "-")
   }
   else if (!center & scale) {
     s <- Rfast::colVars(x, std = TRUE)
-    y <- eachrow(x, s, oper = "/")
+    y <- Rfast::eachrow(x, s, oper = "/")
   } else {
     y = x
   }
@@ -69,6 +119,7 @@ standardise_giotto = function (x, center = TRUE, scale = TRUE)
 #' @param center center data
 #' @param scale scale features
 #' @param k number of principal components to calculate
+#' @keywords internal
 #' @return list of eigenvalues, eigenvectors and pca coordinates
 pca_giotto = function(mymatrix, center = T, scale = T, k = 50) {
 
@@ -99,12 +150,17 @@ pca_giotto = function(mymatrix, center = T, scale = T, k = 50) {
 #' @param center center data
 #' @param scale scale features
 #' @param rev reverse PCA
+#' @param set_seed use of seed
+#' @param seed_number seed number to use
+#' @keywords internal
 #' @return list of eigenvalues, loadings and pca coordinates
 runPCA_prcomp_irlba = function(x,
                                ncp = 100,
                                center = TRUE,
                                scale = TRUE,
                                rev = FALSE,
+                               set_seed = TRUE,
+                               seed_number = 1234,
                                ...) {
 
   min_ncp = min(dim(x))
@@ -118,6 +174,9 @@ runPCA_prcomp_irlba = function(x,
 
     x = t_giotto(x)
 
+    if(set_seed == TRUE) {
+      set.seed(seed = seed_number)
+    }
     pca_res = irlba::prcomp_irlba(x = x, n = ncp, center = center, scale. = scale, ...)
     # eigenvalues
     eigenvalues = pca_res$sdev^2
@@ -133,6 +192,9 @@ runPCA_prcomp_irlba = function(x,
 
   } else {
 
+    if(set_seed == TRUE) {
+      set.seed(seed = seed_number)
+    }
     pca_res = irlba::prcomp_irlba(x = x, n = ncp, center = center, scale. = scale, ...)
     # eigenvalues
     eigenvalues = pca_res$sdev^2
@@ -161,14 +223,22 @@ runPCA_prcomp_irlba = function(x,
 #' @param ncp number of principal components to calculate
 #' @param scale scale features
 #' @param rev reverse PCA
+#' @param set_seed use of seed
+#' @param seed_number seed number to use
+#' @keywords internal
 #' @return list of eigenvalues, loadings and pca coordinates
 runPCA_factominer = function(x,
                              ncp = 100,
                              scale = TRUE,
                              rev = FALSE,
+                             set_seed = TRUE,
+                             seed_number = 1234,
                              ...) {
 
-  if(!is(x, 'matrix')) {
+  # verify if optional package is installed
+  package_check(pkg_name = "FactoMineR", repository = "CRAN")
+
+  if(!methods::is(x, 'matrix')) {
     x = as.matrix(x)
   }
 
@@ -181,6 +251,9 @@ runPCA_factominer = function(x,
       ncp = nrow(x)
     }
 
+    if(set_seed == TRUE) {
+      set.seed(seed = seed_number)
+    }
     pca_res = FactoMineR::PCA(X = x, ncp = ncp, scale.unit = scale, graph = F, ...)
 
     # eigenvalues
@@ -205,6 +278,9 @@ runPCA_factominer = function(x,
       ncp = ncol(x)
     }
 
+    if(set_seed == TRUE) {
+      set.seed(seed = seed_number)
+    }
     pca_res = FactoMineR::PCA(X = x, ncp = ncp, scale.unit = scale, graph = F, ...)
 
     # eigenvalues
@@ -230,7 +306,6 @@ runPCA_factominer = function(x,
 
 
 
-
 #' @title create_genes_to_use_matrix
 #' @name create_genes_to_use_matrix
 #' @description subsets matrix based on vector of genes or hvg column
@@ -238,6 +313,7 @@ runPCA_factominer = function(x,
 #' @param sel_matrix selected expression matrix
 #' @param genes_to_use genes to use, character or vector of genes
 #' @param verbose verbosity
+#' @keywords internal
 #' @return subsetted matrix based on selected genes
 create_genes_to_use_matrix = function(gobject,
                                       sel_matrix,
@@ -275,11 +351,13 @@ create_genes_to_use_matrix = function(gobject,
 #' @param name arbitrary name for PCA run
 #' @param genes_to_use subset of genes to use for PCA
 #' @param return_gobject boolean: return giotto object (default = TRUE)
-#' @param center center data first (default = FALSE)
-#' @param scale_unit scale features before PCA
-#' @param rev do a reverse PCA
+#' @param center center data first (default = TRUE)
+#' @param scale_unit scale features before PCA (default = TRUE)
 #' @param ncp number of principal components to calculate
 #' @param method which implementation to use
+#' @param rev do a reverse PCA
+#' @param set_seed use of seed
+#' @param seed_number seed number to use
 #' @param verbose verbosity of the function
 #' @param ... additional parameters for PCA (see details)
 #' @return giotto object with updated PCA dimension recuction
@@ -293,19 +371,14 @@ create_genes_to_use_matrix = function(gobject,
 #' @export
 #' @examples
 #'
-#' # 1. create giotto object
-#' expr_path = system.file("extdata", "seqfish_field_expr.txt", package = 'Giotto')
-#' loc_path = system.file("extdata", "seqfish_field_locs.txt", package = 'Giotto')
-#' VC_small <- createGiottoObject(raw_exprs = expr_path, spatial_locs = loc_path)
+#' data(mini_giotto_single_cell)
 #'
-#' # 2. normalize giotto
-#' VC_small <- normalizeGiotto(gobject = VC_small, scalefactor = 6000)
-#' VC_small <- addStatistics(gobject = VC_small)
+#' # run PCA
+#' mini_giotto_single_cell <- runPCA(gobject = mini_giotto_single_cell,
+#'                                   center = TRUE, scale_unit = TRUE)
 #'
-#' # 3. dimension reduction
-#' VC_small <- calculateHVG(gobject = VC_small)
-#' VC_small <- runPCA(gobject = VC_small)
-#' plotPCA(VC_small)
+#' # plot PCA results
+#' plotPCA(mini_giotto_single_cell)
 #'
 runPCA <- function(gobject,
                    expression_values = c('normalized', 'scaled', 'custom'),
@@ -313,22 +386,24 @@ runPCA <- function(gobject,
                    name = 'pca',
                    genes_to_use = 'hvg',
                    return_gobject = TRUE,
-                   center = F,
-                   scale_unit = F,
+                   center = TRUE,
+                   scale_unit = TRUE,
                    ncp = 100,
                    method = c('irlba','factominer'),
                    rev = FALSE,
+                   set_seed = TRUE,
+                   seed_number = 1234,
                    verbose = TRUE,
                    ...) {
 
 
   # expression values to be used
   values = match.arg(expression_values, c('normalized', 'scaled', 'custom'))
-  expr_values = Giotto:::select_expression_values(gobject = gobject, values = values)
+  expr_values = select_expression_values(gobject = gobject, values = values)
 
   ## subset matrix
   if(!is.null(genes_to_use)) {
-    expr_values = Giotto:::create_genes_to_use_matrix(gobject = gobject,
+    expr_values = create_genes_to_use_matrix(gobject = gobject,
                                                       sel_matrix = expr_values,
                                                       genes_to_use = genes_to_use,
                                                       verbose = verbose)
@@ -344,9 +419,13 @@ runPCA <- function(gobject,
   if(reduction == 'cells') {
     # PCA on cells
     if(method == 'irlba') {
-      pca_object = runPCA_prcomp_irlba(x = t_giotto(expr_values), center = center, scale = scale_unit, ncp = ncp, rev = rev, ...)
+      pca_object = runPCA_prcomp_irlba(x = t_giotto(expr_values),
+                                       center = center, scale = scale_unit, ncp = ncp,
+                                       rev = rev, set_seed = set_seed, seed_number = seed_number, ...)
     } else if(method == 'factominer') {
-      pca_object = runPCA_factominer(x = t_giotto(expr_values), scale = scale_unit, ncp = ncp, rev = rev, ...)
+      pca_object = runPCA_factominer(x = t_giotto(expr_values),
+                                     scale = scale_unit, ncp = ncp, rev = rev,
+                                     set_seed = set_seed, seed_number = seed_number, ...)
     } else {
       stop('only PCA methods from the irlba and factominer package have been implemented \n')
     }
@@ -354,9 +433,13 @@ runPCA <- function(gobject,
   } else {
     # PCA on genes
     if(method == 'irlba') {
-      pca_object = runPCA_prcomp_irlba(x = expr_values, center = center, scale = scale_unit, ncp = ncp, rev = rev, ...)
+      pca_object = runPCA_prcomp_irlba(x = expr_values,
+                                       center = center, scale = scale_unit, ncp = ncp,
+                                       rev = rev, set_seed = set_seed, seed_number = seed_number, ...)
     } else if(method == 'factominer') {
-      pca_object = runPCA_factominer(x = expr_values, scale = scale_unit, ncp = ncp, rev = rev, ...)
+      pca_object = runPCA_factominer(x = expr_values,
+                                     scale = scale_unit, ncp = ncp, rev = rev,
+                                     set_seed = set_seed, seed_number = seed_number, ...)
     } else {
       stop('only PCA methods from the irlba and factominer package have been implemented \n')
     }
@@ -373,7 +456,7 @@ runPCA <- function(gobject,
 
     }
 
-    dimObject = Giotto:::create_dimObject(name = name,
+    dimObject = create_dimObject(name = name,
                                           reduction_method = 'pca',
                                           coordinates = pca_object$coords,
                                           misc = list(eigenvalues = pca_object$eigenvalues,
@@ -416,6 +499,7 @@ runPCA <- function(gobject,
 #' @param ncp number of principal components to calculate
 #' @param ylim y-axis limits on scree plot
 #' @return ggplot
+#' @keywords internal
 create_screeplot = function(pca_obj, ncp = 20, ylim = c(0, 20)) {
 
 
@@ -485,6 +569,7 @@ create_screeplot = function(pca_obj, ncp = 20, ylim = c(0, 20)) {
 #' @param save_plot directly save the plot [boolean]
 #' @param save_param list of saving parameters from all_plots_save_function()
 #' @param default_save_name default save name for saving, don't change, change save_name in save_param
+#' @param ... additional arguments to pca function, see \code{\link{runPCA}}
 #' @return ggplot object for scree method
 #' @details
 #'  Screeplot works by plotting the explained variance of each
@@ -494,7 +579,11 @@ create_screeplot = function(pca_obj, ncp = 20, ylim = c(0, 20)) {
 #'  create it if it's not available (see \code{\link{runPCA}})
 #' @export
 #' @examples
-#'     screePlot(gobject)
+#'
+#' data(mini_giotto_single_cell)
+#'
+#' screePlot(mini_giotto_single_cell, ncp = 10)
+#'
 screePlot = function(gobject,
                      name = 'pca',
                      expression_values = c('normalized', 'scaled', 'custom'),
@@ -511,7 +600,8 @@ screePlot = function(gobject,
                      return_plot = NA,
                      save_plot = NA,
                      save_param = list(),
-                     default_save_name = 'screePlot') {
+                     default_save_name = 'screePlot',
+                     ...) {
 
 
   # select direction of reduction
@@ -561,7 +651,7 @@ screePlot = function(gobject,
         stop('only PCA methods from the irlba and factominer package have been implemented \n')
       }
 
-      dimObject = Giotto:::create_dimObject(name = name,
+      dimObject = create_dimObject(name = name,
                                             reduction_method = 'pca',
                                             coordinates = pca_object$coords,
                                             misc = list(eigenvalues = pca_object$eigenvalues,
@@ -596,24 +686,30 @@ screePlot = function(gobject,
 #' @param jackstraw_data result from jackstraw function
 #' @param ncp number of principal components to calculate
 #' @param ylim y-axis limits on jackstraw plot
-#' @param p-value threshold to call a PC significant
+#' @param threshold p.value threshold to call a PC significant
+#' @keywords internal
 #' @return ggplot
-create_jackstrawplot = function(jackstraw_data, ncp = 20, ylim = c(0, 1), threshold = 0.01) {
+create_jackstrawplot = function(jackstraw_data,
+                                ncp = 20,
+                                ylim = c(0, 1),
+                                threshold = 0.01) {
 
+  # data.table variables
+  PC = p.val = NULL
 
   testDT = data.table(PC = paste0('PC.', 1:length(jackstraw_data)),
                       p.val = jackstraw_data)
   testDT[, PC := factor(PC, levels = PC)]
   testDT[, sign := ifelse(p.val <= threshold, 'sign', 'n.s.')]
 
-  pl = ggplot()
-  pl = pl + theme_bw()
-  pl = pl + geom_point(data = testDT[1:ncp], aes(x = PC, y = p.val, fill = sign), shape = 21)
-  pl = pl + scale_fill_manual(values  = c('n.s.' = 'lightgrey', 'sign' = 'darkorange'))
-  pl = pl + theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
-  pl = pl + coord_cartesian(ylim = ylim)
-  pl = pl + theme(panel.grid.major.x = element_blank())
-  pl = pl + labs(x = '', y = 'p-value per PC')
+  pl = ggplot2::ggplot()
+  pl = pl + ggplot2::theme_bw()
+  pl = pl + ggplot2::geom_point(data = testDT[1:ncp], ggplot2::aes(x = PC, y = p.val, fill = sign), shape = 21)
+  pl = pl + ggplot2::scale_fill_manual(values  = c('n.s.' = 'lightgrey', 'sign' = 'darkorange'))
+  pl = pl + ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1))
+  pl = pl + ggplot2::coord_cartesian(ylim = ylim)
+  pl = pl + ggplot2::theme(panel.grid.major.x = ggplot2::element_blank())
+  pl = pl + ggplot2::labs(x = '', y = 'p-value per PC')
 
   return(pl)
 
@@ -646,7 +742,16 @@ create_jackstrawplot = function(jackstraw_data, ncp = 20, ylim = c(0, 1), thresh
 #'  \cr
 #' @export
 #' @examples
-#'     jackstrawPlot(gobject)
+#'
+#' \donttest{
+#'
+#' data(mini_giotto_single_cell)
+#'
+#' # jackstraw package is required to run
+#' jackstrawPlot(mini_giotto_single_cell, ncp = 10)
+#'
+#' }
+#'
 jackstrawPlot = function(gobject,
                          expression_values = c('normalized', 'scaled', 'custom'),
                          reduction = c('cells', 'genes'),
@@ -657,7 +762,7 @@ jackstrawPlot = function(gobject,
                          ylim = c(0, 1),
                          iter = 10,
                          threshold = 0.01,
-                         verbose = T,
+                         verbose = TRUE,
                          show_plot = NA,
                          return_plot = NA,
                          save_plot = NA,
@@ -665,12 +770,12 @@ jackstrawPlot = function(gobject,
                          default_save_name = 'jackstrawPlot') {
 
 
-  if("jackstraw" %in% rownames(installed.packages()) == FALSE) {
-    stop("\n package 'jackstraw' is not yet installed \n",
-         "To install: \n",
-         "install.packages('jackstraw') \n"
-    )
-  }
+  package_check(pkg_name = "jackstraw", repository = "CRAN")
+
+  # print message with information #
+  if(verbose) message("using 'jackstraw' to identify significant PCs If used in published research, please cite:
+  Neo Christopher Chung and John D. Storey (2014).
+  'Statistical significance of variables driving systematic variation in high-dimensional data. Bioinformatics")
 
   # select direction of reduction
   reduction = match.arg(reduction, c('cells', 'genes'))
@@ -762,8 +867,6 @@ jackstrawPlot = function(gobject,
 #'  systematically permuting genes it identifies robust, and thus significant, PCs.
 #'  \cr
 #' @export
-#' @examples
-#'     signPCA(gobject)
 signPCA <- function(gobject,
                     name = 'pca',
                     method = c('screeplot', 'jackstraw'),
@@ -918,7 +1021,7 @@ signPCA <- function(gobject,
 #' @param n_components UMAP param: number of components
 #' @param n_epochs UMAP param: number of epochs
 #' @param min_dist UMAP param: minimum distance
-#' @param n_threads UMAP param: threads to use
+#' @param n_threads UMAP param: threads/cores to use
 #' @param spread UMAP param: spread
 #' @param set_seed use of seed
 #' @param seed_number seed number to use
@@ -936,20 +1039,14 @@ signPCA <- function(gobject,
 #' @export
 #' @examples
 #'
-#' # 1. create giotto object
-#' expr_path = system.file("extdata", "seqfish_field_expr.txt", package = 'Giotto')
-#' loc_path = system.file("extdata", "seqfish_field_locs.txt", package = 'Giotto')
-#' VC_small <- createGiottoObject(raw_exprs = expr_path, spatial_locs = loc_path)
+#' data(mini_giotto_single_cell)
 #'
-#' # 2. normalize giotto
-#' VC_small <- normalizeGiotto(gobject = VC_small, scalefactor = 6000)
-#' VC_small <- addStatistics(gobject = VC_small)
+#' mini_giotto_single_cell <- runUMAP(mini_giotto_single_cell,
+#'                                    dimensions_to_use = 1:3,
+#'                                    n_threads = 1,
+#'                                    n_neighbors = 3)
 #'
-#' # 3. dimension reduction
-#' VC_small <- calculateHVG(gobject = VC_small)
-#' VC_small <- runPCA(gobject = VC_small)
-#' VC_small <- runUMAP(VC_small, dimensions_to_use = 1:5, n_threads = 2)
-#' plotUMAP(gobject = VC_small)
+#' plotUMAP(gobject = mini_giotto_single_cell)
 #'
 runUMAP <- function(gobject,
                     expression_values = c('normalized', 'scaled', 'custom'),
@@ -964,15 +1061,17 @@ runUMAP <- function(gobject,
                     n_components = 2,
                     n_epochs = 400,
                     min_dist = 0.01,
-                    n_threads = 1,
+                    n_threads = NA,
                     spread = 5,
-                    set_seed = T,
+                    set_seed = TRUE,
                     seed_number = 1234,
                     verbose = T,
                     ...) {
 
   reduction = match.arg(reduction, choices = c('cells', 'genes'))
 
+  # set cores to use
+  n_threads = determine_cores(cores = n_threads)
 
   ## umap on cells ##
   if(reduction == 'cells') {
@@ -1009,6 +1108,9 @@ runUMAP <- function(gobject,
     uwot_clus <- uwot::umap(X = as.matrix(matrix_to_use), n_neighbors = n_neighbors, n_components = n_components,
                             n_epochs = n_epochs, min_dist = min_dist, n_threads = n_threads, spread = spread, ...)
     uwot_clus_pos_DT <- data.table::as.data.table(uwot_clus)
+
+    # data.table variables
+    cell_ID = NULL
     uwot_clus_pos_DT[, cell_ID := rownames(matrix_to_use)]
 
 
@@ -1111,20 +1213,15 @@ runUMAP <- function(gobject,
 #' @export
 #' @examples
 #'
-#' # 1. create giotto object
-#' expr_path = system.file("extdata", "seqfish_field_expr.txt", package = 'Giotto')
-#' loc_path = system.file("extdata", "seqfish_field_locs.txt", package = 'Giotto')
-#' VC_small <- createGiottoObject(raw_exprs = expr_path, spatial_locs = loc_path)
+#' data(mini_giotto_single_cell)
 #'
-#' # 2. normalize giotto
-#' VC_small <- normalizeGiotto(gobject = VC_small, scalefactor = 6000)
-#' VC_small <- addStatistics(gobject = VC_small)
+#' mini_giotto_single_cell <- runtSNE(mini_giotto_single_cell,
+#'                                    dimensions_to_use = 1:3,
+#'                                    n_threads = 1,
+#'                                    n_neighbors = 3,
+#'                                    perplexity = 1)
 #'
-#' # 3. dimension reduction
-#' VC_small <- calculateHVG(gobject = VC_small)
-#' VC_small <- runPCA(gobject = VC_small)
-#' VC_small <- runTSNE(VC_small, dimensions_to_use = 1:5, n_threads = 2)
-#' plotTSNE(gobject = VC_small)
+#' plotTSNE(gobject = mini_giotto_single_cell)
 #'
 runtSNE <- function(gobject,
                     expression_values = c('normalized', 'scaled', 'custom'),
@@ -1187,6 +1284,9 @@ runtSNE <- function(gobject,
                              pca = do_PCA_first, ...)
 
     tsne_clus_pos_DT <- data.table::as.data.table(tsne_clus$Y)
+
+    # data.table variables
+    cell_ID = NULL
     tsne_clus_pos_DT[, cell_ID := rownames(matrix_to_use)]
 
     if(set_seed == TRUE) {

@@ -6,6 +6,12 @@
 \usage{
 t_giotto(mymatrix)
 }
+\arguments{
+\item{mymatrix}{matrix object}
+}
+\value{
+transposed matrix
+}
 \description{
-t_giotto
+t function that works with multiple matrix representations
 }

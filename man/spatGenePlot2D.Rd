@@ -78,6 +78,8 @@ spatGenePlot2D(
 
 \item{spatial_network_name}{name of spatial network to use}
 
+\item{edge_alpha}{alpha of edge}
+
 \item{show_grid}{show spatial grid}
 
 \item{grid_color}{color of spatial grid}
@@ -128,11 +130,9 @@ spatGenePlot2D(
 
 \item{save_plot}{directly save the plot [boolean]}
 
-\item{save_param}{list of saving parameters from \code{\link{all_plots_save_function}}}
+\item{save_param}{list of saving parameters, see \code{\link{showSaveParameters}}}
 
 \item{default_save_name}{default save name for saving, don't change, change save_name in save_param}
-
-\item{...}{parameters for cowplot::save_plot()}
 }
 \value{
 ggplot
@@ -144,8 +144,19 @@ Visualize cells and gene expression according to spatial coordinates
 Description of parameters.
 }
 \examples{
-    spatGenePlot2D(gobject)
+
+data(mini_giotto_single_cell)
+
+all_genes = slot(mini_giotto_single_cell, 'gene_ID')
+selected_genes = all_genes[1:2]
+spatGenePlot2D(mini_giotto_single_cell, genes = selected_genes, point_size = 3)
+
 }
 \seealso{
 \code{\link{spatGenePlot3D}}
+
+Other spatial gene expression visualizations: 
+\code{\link{spatGenePlot3D}()},
+\code{\link{spatGenePlot}()}
 }
+\concept{spatial gene expression visualizations}

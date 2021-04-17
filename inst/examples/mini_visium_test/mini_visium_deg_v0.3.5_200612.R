@@ -7,7 +7,9 @@ library(Giotto)
 ## Giotto 0.3.5 ##
 ## mini-test Visium Brain Giotto 0.3.5 ##
 
-temp_dir = '/path/to/your/temporary/directory/results'
+## !! change this directory path !!:
+#temp_dir = '/path/to/your/temporary/directory/results'
+temp_dir = getwd()
 
 ## 1. giotto object ####
 expr_path = system.file("extdata", "visium_DG_expr.txt", package = 'Giotto')
@@ -78,6 +80,7 @@ brain_small <- createNearestNetwork(gobject = brain_small, dimensions_to_use = 1
 brain_small <- doLeidenCluster(gobject = brain_small, resolution = 0.4, n_iterations = 1000)
 plotUMAP(gobject = brain_small, cell_color = 'leiden_clus', show_NN_network = T, point_size = 2.5)
 
+
 ## 5. co-visualize ####
 spatDimPlot(gobject = brain_small, cell_color = 'leiden_clus',
             dim_point_size = 2, spat_point_size = 2.5)
@@ -125,14 +128,25 @@ brain_sc_markers = data.table::fread(sign_matrix_path) # file don't exist in dat
 sig_matrix = as.matrix(brain_sc_markers[,-1]); rownames(sig_matrix) = brain_sc_markers$Event
 
 ## enrichment tests
-visium_brain = createSpatialEnrich(brain_small, sign_matrix = sig_matrix, enrich_method = 'PAGE') #default = 'PAGE'
+brain_small = createSpatialEnrich(brain_small, sign_matrix = sig_matrix, enrich_method = 'PAGE') #default = 'PAGE'
 
 ## heatmap of enrichment versus annotation (e.g. clustering result)
 cell_types = colnames(sig_matrix)
-plotMetaDataCellsHeatmap(gobject = visium_brain,
+plotMetaDataCellsHeatmap(gobject = brain_small,
                          metadata_cols = 'leiden_clus',
                          value_cols = cell_types,
-                         spat_enr_names = 'PAGE',x_text_size = 8, y_text_size = 8)
+                         spat_enr_names = 'PAGE',
+                         x_text_size = 8, y_text_size = 8)
+
+
+enrichment_results = brain_small@spatial_enrichment$PAGE
+enrich_cell_types = colnames(enrichment_results)
+enrich_cell_types = enrich_cell_types[enrich_cell_types != 'cell_ID']
+
+## spatplot
+spatCellPlot(gobject = brain_small, spat_enr_names = 'PAGE',
+             cell_annotation_values = enrich_cell_types,
+             cow_n_col = 3,coord_fix_ratio = NULL, point_size = 1)
 
 
 
@@ -144,6 +158,9 @@ brain_small <- createSpatialGrid(gobject = brain_small,
 showGrids(brain_small)
 spatPlot(gobject = brain_small, show_grid = T, point_size = 1.5)
 
+annotated_grid = annotateSpatialGrid(brain_small)
+annotated_grid_metadata = annotateSpatialGrid(brain_small,
+                                              cluster_columns = c('leiden_clus', 'cell_types', 'nr_genes'))
 
 
 ## 9. spatial network ####
@@ -151,6 +168,7 @@ plotStatDelaunayNetwork(gobject = brain_small, maximum_distance = 300)
 brain_small = createSpatialNetwork(gobject = brain_small, minimum_k = 2, maximum_distance_delaunay = 400)
 brain_small = createSpatialNetwork(gobject = brain_small, minimum_k = 2, method = 'kNN', k = 10)
 showNetworks(brain_small)
+
 
 spatPlot(gobject = brain_small, show_network = T,
          network_color = 'blue', spatial_network_name = 'Delaunay_network',
@@ -180,6 +198,7 @@ spatGenePlot(brain_small, expression_values = 'scaled', genes = silh_spatialgene
              point_shape = 'border', point_border_stroke = 0.1,
              show_network = F, network_color = 'lightgrey', point_size = 2.5,
              cow_n_col = 2)
+
 
 
 ## 11. spatial co-expression patterns ####

@@ -33,7 +33,7 @@ detectSpatialCorGenes(
 
 \item{min_cells_per_grid}{minimum number of cells to consider a grid}
 
-\item{b}{smoothing factor beteen 0 and 1 (default: automatic)}
+\item{cor_method}{correlation method}
 }
 \value{
 returns a spatial correlation object: "spatCorObject"
@@ -53,9 +53,6 @@ fully connected network by setting minimal_k > 0 in the \code{\link{createSpatia
  from its own expression.}
 }
 The spatCorObject can be further explored with showSpatialCorGenes()
-}
-\examples{
-    detectSpatialCorGenes(gobject)
 }
 \seealso{
 \code{\link{showSpatialCorGenes}}

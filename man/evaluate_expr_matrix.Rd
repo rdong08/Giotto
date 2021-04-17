@@ -8,6 +8,10 @@ evaluate_expr_matrix(inputmatrix, sparse = TRUE, cores = NA)
 }
 \arguments{
 \item{inputmatrix}{inputmatrix to evaluate}
+
+\item{sparse}{create sparse matrix (default = TRUE)}
+
+\item{cores}{how many cores to use}
 }
 \value{
 sparse matrix
@@ -18,6 +22,4 @@ Evaluate expression matrices.
 \details{
 The inputmatrix can be a matrix, sparse matrix, data.frame, data.table or path to any of these.
 }
-\examples{
-    evaluate_expr_matrix()
-}
+\keyword{internal}
